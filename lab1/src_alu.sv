@@ -19,13 +19,52 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
+//module OR #(parameter WIDTH = 8)(
+//    input  logic [WIDTH-1:0] A,
+//    input  logic [WIDTH-1:0] B,
+//    output logic [WIDTH-1:0] R
+//    );
+//    assign R = A | B;
+//endmodule
+
+//module AND #(parameter WIDTH = 8)(
+//    input  logic [WIDTH-1:0] A,
+//    input  logic [WIDTH-1:0] B,
+//    output logic [WIDTH-1:0] R
+//    );
+//    assign R = A & B;
+//endmodule
+
+//module SLTU #(parameter WIDTH = 8)(
+//    input  logic [WIDTH-1:0] A,
+//    input  logic [WIDTH-1:0] B,
+//    output logic [WIDTH-1:0] R
+//    );
+//    assign R = (A < B) ? 1 : 0;
+//endmodule
+
+//module ADD #(parameter WIDTH = 8)(
+//    input  logic [WIDTH-1:0] A,
+//    input  logic [WIDTH-1:0] B,
+//    output logic [WIDTH-1:0] R
+//    );
+//    assign R = A + B;
+//endmodule
 
 module ADD #(parameter WIDTH = 8)(
     input  logic [WIDTH-1:0] A,
     input  logic [WIDTH-1:0] B,
+    input logic C,
     output logic [WIDTH-1:0] R
     );
-    assign R = A + B;
+    logic [WIDTH:0] c;
+    always_comb begin
+        c[0] = C;
+        for (int i = 0; i < WIDTH; i++) begin
+            R[i] = A[i] ^ B[i] ^ c[i];
+            c[i+1] = A[i] & B[i] | A[i] & c[i] | B[i] & c[i];
+        end
+    end
 endmodule
 
 module SUB #(parameter WIDTH = 8)(
@@ -35,7 +74,8 @@ module SUB #(parameter WIDTH = 8)(
     );
     ADD #(.WIDTH(WIDTH)) add (
         .A (A),
-        .B (~B + 1),
+        .B (~B),
+        .C (1),
         .R (R)
     );
 endmodule
@@ -45,29 +85,7 @@ module XOR #(parameter WIDTH = 8)(
     input  logic [WIDTH-1:0] B,
     output logic [WIDTH-1:0] R
     );
-    always_comb begin
-        R <= A ^ B;
-    end
-endmodule
-
-module OR #(parameter WIDTH = 8)(
-    input  logic [WIDTH-1:0] A,
-    input  logic [WIDTH-1:0] B,
-    output logic [WIDTH-1:0] R
-    );
-    always_comb begin
-        R <= A | B;
-    end
-endmodule
-
-module AND #(parameter WIDTH = 8)(
-    input  logic [WIDTH-1:0] A,
-    input  logic [WIDTH-1:0] B,
-    output logic [WIDTH-1:0] R
-    );
-    always_comb begin
-        R <= A & B;
-    end
+    assign R = A ^ B;
 endmodule
 
 module SLL #(parameter WIDTH = 8)(
@@ -76,7 +94,10 @@ module SLL #(parameter WIDTH = 8)(
     output logic [WIDTH-1:0] R
     );
     always_comb begin
-        R <= A << B;
+        if (B >= WIDTH)
+            R = 0;
+        else
+            R = A << B;
     end
 endmodule
 
@@ -86,7 +107,10 @@ module SRL #(parameter WIDTH = 8)(
     output logic [WIDTH-1:0] R
     );
     always_comb begin
-        R <= A >> B;
+        if (B >= WIDTH)
+            R = 0;
+        else
+            R = A >> B;
     end
 endmodule
 
@@ -110,28 +134,15 @@ module SLT #(parameter WIDTH = 8)(
     );
     always_comb begin
         unique case ({A[WIDTH-1], B[WIDTH-1]})
-            2'b00,
-            2'b11:
-                R = (A < B) ? 1 : 0;
             2'b01:
                 R = 0;
             2'b10:
                 R = 1;
-            default: R = 0;
+            default:
+                R = (A < B) ? 1 : 0;
         endcase
     end
 endmodule
-
-module SLTU #(parameter WIDTH = 8)(
-    input  logic [WIDTH-1:0] A,
-    input  logic [WIDTH-1:0] B,
-    output logic [WIDTH-1:0] R
-    );
-    always_comb begin
-        R = (A < B) ? 1 : 0;
-    end
-endmodule
-
 
 module ALU #(parameter WIDTH = 8)(
     input  logic [3:0] OPCODE,
@@ -151,11 +162,11 @@ module ALU #(parameter WIDTH = 8)(
     logic [WIDTH-1:0] R_SLT;
     logic [WIDTH-1:0] R_SLTU;
 
-    ADD  #(WIDTH) _add  (.A(A), .B(B), .R(R_ADD));
+    ADD  #(WIDTH) _add  (.A(A), .B(B), .C(0), .R(R_ADD));
     SUB  #(WIDTH) _sub  (.A(A), .B(B), .R(R_SUB));
     XOR  #(WIDTH) _xor  (.A(A), .B(B), .R(R_XOR));
-    OR   #(WIDTH) _or   (.A(A), .B(B), .R(R_OR));
-    AND  #(WIDTH) _and  (.A(A), .B(B), .R(R_AND));
+//    OR   #(WIDTH) _or   (.A(A), .B(B), .R(R_OR));
+//    AND  #(WIDTH) _and  (.A(A), .B(B), .R(R_AND));
     SLL  #(WIDTH) _sll  (.A(A), .B(B), .R(R_SLL));
     SRL  #(WIDTH) _srl  (.A(A), .B(B), .R(R_SRL));
     SRA  #(WIDTH) _sra  (.A(A), .B(B), .R(R_SRA));
@@ -166,9 +177,11 @@ module ALU #(parameter WIDTH = 8)(
         unique case (OPCODE)
             4'b0000: R = R_ADD;
             4'b1000: R = R_SUB;
-            4'b0100: R = R_OR;
-            4'b0110: R = R_AND;
-            4'b0111: R = R_AND;
+            4'b0100: R = R_XOR;
+//            4'b0110: R = R_OR;
+//            4'b0111: R = R_AND;
+            4'b0110: R = A | B;
+            4'b0111: R = A & B;
             4'b0001: R = R_SLL;
             4'b0101: R = R_SRL;
             4'b1101: R = R_SRA;
@@ -178,7 +191,5 @@ module ALU #(parameter WIDTH = 8)(
             default: R = 0;
         endcase
     end
-
-    assign ZF = (R == '0);
-
+    assign ZF = (R == 0);
 endmodule
