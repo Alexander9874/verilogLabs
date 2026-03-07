@@ -23,13 +23,14 @@
 module top_alu(
     input clk
     );
+    localparam WIDTH = 32;
     logic [3:0] OPCODE;
-    logic [7:0] A;
-    logic [7:0] B;
-    logic [7:0] R;
+    logic [WIDTH-1:0] A;
+    logic [WIDTH-1:0] B;
+    logic [WIDTH-1:0] R;
     logic ZF;
     
-    ALU #(.WIDTH(8)) alu_inst (
+    ALU #(.WIDTH(WIDTH)) alu_inst (
         .OPCODE(OPCODE),
         .A(A),
         .B(B),

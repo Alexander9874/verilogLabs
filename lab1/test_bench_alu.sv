@@ -20,7 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module TB_ALU;
-    localparam WIDTH = 4;
+    localparam WIDTH = 8;
 
     const logic [3:0] opcode_array [9:0] = '{4'b0000, 4'b1000,
                                              4'b0100, 4'b0110,
@@ -74,13 +74,13 @@ module TB_ALU;
                             else $error("\tOPCODE = %b (SRL)\tA = %b\tB = %b\tR = %b (%b)\n", OPCODE, A, B, R, A >> B);
                         4'b1101:
                             assert ($signed(R) == ($signed(A) >>> B))
-                            else $error("\tOPCODE = %b (SRA)\tA = %b\tB = %b\tR = %b (%b)\n", OPCODE, A, B, R, $signed(A) >>> B);
+                            else $error("\tOPCODE = %b (SRA)\tA = %b\tB = %b\tR = %b (%b)\t\tA[WIDTH] = %b\n", OPCODE, A, B, R, $signed(A) >>> B, OPCODE[3] & A[WIDTH - 1]);
                         4'b0010:
                             assert (R == (($signed(A) < $signed(B)) ? 1 : 0))
-                            else $error("\tOPCODE = %b (SLT)\tA = %b\tB = %b\tR = %b (%b)\n", OPCODE, A, B, R, ($signed(A) < $signed(B)) ? 1 : 0);
+                            else $error("\tOPCODE = %b (SLT)\tA = %b\tB = %b\tR = %b (%b)\n", OPCODE, A, B, R, WIDTH'(($signed(A) < $signed(B)) ? 1 : 0));
                         4'b0011:
                             assert (R == ((A < B) ? 1 : 0))
-                            else $error("\tOPCODE = %b (SLTU)\tA = %b\tB = %b\tR = %b (%b)\n", OPCODE, A, B, R, (A < B) ? 1 : 0);
+                            else $error("\tOPCODE = %b (SLTU)\tA = %b\tB = %b\tR = %b (%b)\n", OPCODE, A, B, R, WIDTH'((A < B) ? 1 : 0));
                         default:
                             assert (R == 0)
                             else $error("\tOPCODE = %b (NONE)\tA = %b\tB = %b\tR = %b (%b)\n", OPCODE, A, B, R, 0);
