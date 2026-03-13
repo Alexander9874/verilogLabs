@@ -85,6 +85,8 @@ module TB_ALU;
                             assert (R == 0)
                             else $error("\tOPCODE = %b (NONE)\tA = %b\tB = %b\tR = %b (%b)\n", OPCODE, A, B, R, 0);
                     endcase
+		    assert (ZF == (R == 0 ? 1 : 0))
+		    else $error("OPCODE = %b (ANY)\tA = %b\tB = %b\tR = %b\tZF = %b (%b)\n", OPCODE, A, B, R, ZF, R == 0 ? 1 : 0);
                 end
             end
         end
