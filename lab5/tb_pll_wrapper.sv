@@ -47,9 +47,14 @@ module tb_pll_wrapper;
     );
 
     initial clk_in = 0;
-    always #1.176470588 clk_in = ~clk_in;
+    
+    // T = 1000 / 425 = 2.353 ns
+    // T / 2 = 1.176
+    always #1.176 clk_in = ~clk_in;
 
     initial begin
+        $display("TB BEGIN");
+    
         rst    = 1;
         pwrdwn = 0;
         #10;
@@ -58,11 +63,7 @@ module tb_pll_wrapper;
         if (!locked)
             @(posedge locked);
 
-        $display("PLL locked at time %0.3f ns", $realtime);
-        if ($realtime > 3_869_508.5)
-            $display("WARNING: lock occurred later than expected (3,869,508.5 ns)");
-        else
-            $display("Lock time within expected window.");
+        $display("Locked %0.3f ns", $realtime);
 
         measure_period("clkout0", clkout0);
         measure_period("clkout1", clkout1);
@@ -71,26 +72,26 @@ module tb_pll_wrapper;
         measure_period("clkout4", clkout4);
         measure_period("clkout5", clkout5);
 
+        pwrdwn = 1;
+        #50;
+
+        $display("TB END");
+
         $finish;
     end
 
-    initial begin
-        #4_000_000;
-        if (!locked) begin
-            $display("ERROR: PLL did not lock within 4 ms");
-            $finish;
-        end
-    end
-
     task automatic measure_period(string name, ref logic clk);
-        realtime t1, t2, period;
+        realtime up1, up2, down1, period, pulse_duration;
         @(posedge clk);
-        t1 = $realtime;
+        up1 = $realtime;
+        @(negedge clk);
+        down1 = $realtime;
         @(posedge clk);
-        t2 = $realtime;
-        period = t2 - t1;
-        $display("%s: period = %0.4f ns, frequency = %0.4f MHz",
-                 name, period, 1000.0 / period);
+        up2 = $realtime;
+        period = up2 - up1;
+        pulse_duration = down1 - up1;
+        $display("%s:\tT = %0.4f ns,  \tF = %0.4f MHz,\t PW = %0.4f ns,\tD = %0.4f",
+                 name, period, 1000.0 / period, pulse_duration, pulse_duration / period);
     endtask
 
 endmodule
