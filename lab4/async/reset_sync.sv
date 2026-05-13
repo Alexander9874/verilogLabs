@@ -22,11 +22,11 @@
 
 module reset_sync #(
     parameter int STAGES = 2
-) (
+    ) (
     input  logic clk,
     input  logic async_rst,
     output logic sync_rst
-);
+    );
 
     logic [STAGES-1:0] pipe;
 

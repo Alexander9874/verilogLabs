@@ -21,109 +21,133 @@
 
 
 module fifo_async #(
-    parameter  int DATA_WIDTH        = 8,
-    parameter  int DEPTH             = 16,
-    parameter  int ALMOST_EMPTY_LVL  = 20,
-    parameter  int SYNC_STAGES       = 2,
-    localparam int ADDR_W            = $clog2(DEPTH)
-) (
-    input  logic                  WCLK,
-    input  logic                  WR,
-    input  logic [DATA_WIDTH-1:0] DIN,
-    output logic                  FULL,
+    parameter int WIDTH                = 8,
+    parameter int DEPTH                = 16,
+    parameter int ALMOST_EMPTY_PERCENT = 20,
+    parameter int STAGES               = 2,
+    localparam int ADDR_WIDTH          = $clog2(DEPTH),
+    localparam int THRESHOLD           = (DEPTH * ALMOST_EMPTY_PERCENT) / 100
+    ) (
+    input  logic                  wclk,
+    input  logic                  rclk,
+    input  logic                  rst,
+    input  logic                  wr,
+    input  logic                  rd,
+    input  logic [WIDTH-1:0]      din,
 
-    input  logic                  RCLK,
-    input  logic                  RD,
-    output logic [DATA_WIDTH-1:0] DOUT,
-    output logic                  EMPTY,
-    output logic                  ALMOST_EMPTY,
-    output logic [ADDR_W-1:0]     FREE_COUNT,
+    output logic [WIDTH-1:0]      dout,
+    output logic                  empty,
+    output logic                  full,
+    output logic                  almost_empty,
+    output logic [ADDR_WIDTH-1:0] free_count
+    );
 
-    input  logic                  RST
-);
+    logic rst_wclk;
+    logic rst_rclk;
 
-    localparam int AE_THRESH = (DEPTH * ALMOST_EMPTY_LVL) / 100;
+    reset_sync #(.STAGES(STAGES)) _write_reset_sync (
+        .clk(wclk),
+        .async_rst(rst),
+        .sync_rst(rst_wclk)
+        );
 
-    logic rst_wclk, rst_rclk;
+    reset_sync #(.STAGES(STAGES)) _read_reset_sync (
+        .clk(rclk),
+        .async_rst(rst),
+        .sync_rst(rst_rclk)
+        );
 
-    reset_sync #(.STAGES(SYNC_STAGES)) u_rst_wclk (
-        .clk(WCLK), .async_rst(RST), .sync_rst(rst_wclk));
+    logic [ADDR_WIDTH-1:0] ra;
+    logic [ADDR_WIDTH-1:0] wa;    
 
-    reset_sync #(.STAGES(SYNC_STAGES)) u_rst_rclk (
-        .clk(RCLK), .async_rst(RST), .sync_rst(rst_rclk));
+    logic                  w2r_busy;
+    logic                  r2w_busy;
+    logic                  w2r_send;
+    logic                  r2w_send;
+    logic [ADDR_WIDTH-1:0] w2r_last_sent;
+    logic [ADDR_WIDTH-1:0] r2w_last_sent;
+    logic [ADDR_WIDTH-1:0] w2r_wa;
+    logic [ADDR_WIDTH-1:0] r2w_ra;
+    
 
-    logic [ADDR_W-1:0] WA;
-    logic              wr_en;
+    assign w2r_send = ~w2r_busy & (wa != w2r_last_sent);
+    assign r2w_send = ~r2w_busy & (ra != r2w_last_sent);
 
-    assign wr_en = WR & ~FULL;
+    always_ff @(posedge wclk)
+        if (rst_wclk) w2r_last_sent <= '0;
+        else if (w2r_send) w2r_last_sent <= wa;
+        
+    always_ff @(posedge rclk)
+        if (rst_rclk) r2w_last_sent <= '0;
+        else if (r2w_send) r2w_last_sent <= ra;
 
-    counter #(.WIDTH(ADDR_W)) u_waddr (
-        .CLK(WCLK), .CE(wr_en), .R(rst_wclk), .Q(WA));
+    cdc_handshake #(
+        .WIDTH(ADDR_WIDTH),
+        .STAGES(STAGES)
+        ) _w2r_cdc (
+        .src_clk(wclk),
+        .src_rst(rst_wclk),
+        .src_data(wa),
+        .src_send(w2r_send),
+        .src_busy(w2r_busy),
+        .dst_clk(rclk),
+        .dst_rst(rst_rclk),
+        .dst_data(w2r_wa)
+    );
 
-    logic [ADDR_W-1:0] RA;
-    logic              rd_en;
+    cdc_handshake #(
+        .WIDTH(ADDR_WIDTH),
+        .STAGES(STAGES)
+        ) _r2w_cdc (
+        .src_clk(rclk),
+        .src_rst(rst_rclk),
+        .src_data(ra),
+        .src_send(r2w_send),
+        .src_busy(r2w_busy),
+        .dst_clk(wclk),
+        .dst_rst(rst_wclk),
+        .dst_data(r2w_ra)
+    );
+    
+        
+    logic wr_en;
+    logic rd_en;
 
-    assign rd_en = RD & ~EMPTY;
+    assign empty = (w2r_wa == ra);
+    assign full  = ((wa + 1'b1) == r2w_ra);
+    
+    assign wr_en = wr & ~full;
+    assign rd_en = rd & ~empty;
 
-    counter #(.WIDTH(ADDR_W)) u_raddr (
-        .CLK(RCLK), .CE(rd_en), .R(rst_rclk), .Q(RA));
+    counter #(.WIDTH(ADDR_WIDTH)) _write_counter (
+        .clk(wclk),
+        .ce(wr_en),
+        .r(rst_wclk),
+        .q(wa)
+        );
+
+    counter #(.WIDTH(ADDR_WIDTH)) _read_counter (
+        .clk(rclk),
+        .ce(rd_en),
+        .r(rst_rclk),
+        .q(ra)
+        );
 
     dp_ram #(
-        .DATA_WIDTH(DATA_WIDTH),
-        .DEPTH     (DEPTH)
-    ) u_ram (
-        .WCLK(WCLK), .RCLK(RCLK),
-        .WA(WA), .RA(RA),
-        .WR(wr_en), .WD(DIN),
-        .RD(DOUT)
-    );
+        .WIDTH (WIDTH),
+        .DEPTH (DEPTH)
+        ) _dp_ram (
+        .clk(wclk),
+        .wa(wa),
+	.ra(ra),
+        .wr(wr_en),
+	.wd(din),
+        .rd(dout)
+        );
 
-    logic              w2r_busy;
-    logic [ADDR_W-1:0] wa_last_sent;
-    logic              wa_send;
-    logic [ADDR_W-1:0] WA_r;
-    logic w2r_valid_unused;
-
-    assign wa_send = ~w2r_busy & (WA != wa_last_sent);
-
-    always_ff @(posedge WCLK)
-        if (rst_wclk) wa_last_sent <= '0;
-        else if (wa_send) wa_last_sent <= WA;
-
-    cdc_handshake #(.DATA_WIDTH(ADDR_W), .SYNC_STAGES(SYNC_STAGES)) u_w2r (
-        .src_clk(WCLK), .src_rst(rst_wclk),
-        .src_data(WA), .src_send(wa_send), .src_busy(w2r_busy),
-        .dst_clk(RCLK), .dst_rst(rst_rclk),
-        .dst_data(WA_r), .dst_valid(w2r_valid_unused)
-    );
-
-    logic              r2w_busy;
-    logic [ADDR_W-1:0] ra_last_sent;
-    logic              ra_send;
-    logic [ADDR_W-1:0] RA_w;
-    logic r2w_valid_unused;
-
-    assign ra_send = ~r2w_busy & (RA != ra_last_sent);
-
-    always_ff @(posedge RCLK)
-        if (rst_rclk) ra_last_sent <= '0;
-        else if (ra_send) ra_last_sent <= RA;
-
-    cdc_handshake #(.DATA_WIDTH(ADDR_W), .SYNC_STAGES(SYNC_STAGES)) u_r2w (
-        .src_clk(RCLK), .src_rst(rst_rclk),
-        .src_data(RA), .src_send(ra_send), .src_busy(r2w_busy),
-        .dst_clk(WCLK), .dst_rst(rst_wclk),
-        .dst_data(RA_w), .dst_valid(r2w_valid_unused)
-    );
-
-    assign EMPTY = (WA_r == RA);
-
-    assign FULL  = ((WA + 1'b1) == RA_w);
-
-    logic [ADDR_W-1:0] used_count;
-    assign used_count = WA_r - RA;
-    assign FREE_COUNT = (ADDR_W'(DEPTH - 1)) - used_count;
-
-    assign ALMOST_EMPTY = (FREE_COUNT > ADDR_W'(AE_THRESH));
+    logic [ADDR_WIDTH-1:0] count;
+    assign count = (w2r_wa - ra) & (DEPTH - 1);
+    assign free_count = (ADDR_WIDTH)'(DEPTH - count - 1);
+    assign almost_empty = (count <= THRESHOLD);
 
 endmodule

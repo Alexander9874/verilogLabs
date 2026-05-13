@@ -21,17 +21,17 @@
 
 
 module counter #(parameter int WIDTH = 4) (
-    input  logic             CLK,
-    input  logic             CE,
-    input  logic             R,
-    output logic [WIDTH-1:0] Q
+    input  logic             clk,
+    input  logic             ce,
+    input  logic             r,
+    output logic [WIDTH-1:0] q
     );
 
-    always_ff @(posedge CLK) begin
-        if (R)
-            Q <= '0;
-        else if (CE)
-            Q <= Q + 1'b1;
+    always_ff @(posedge clk) begin
+        if (r)
+            q <= '0;
+        else if (ce)
+            q <= q + 1'b1;
     end
 
 endmodule

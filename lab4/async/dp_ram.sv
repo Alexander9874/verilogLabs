@@ -21,26 +21,25 @@
 
 
 module dp_ram #(
-    parameter int DATA_WIDTH = 8,
-    parameter int DEPTH      = 16,
-    localparam    ADDR_WIDTH = $clog2(DEPTH)
+    parameter int WIDTH   = 8,
+    parameter int DEPTH   = 16,
+    localparam ADDR_WIDTH = $clog2(DEPTH)
     ) (
-    input  logic                  WCLK,
-    input  logic                  RCLK,
-    input  logic [ADDR_WIDTH-1:0] WA,
-    input  logic [ADDR_WIDTH-1:0] RA,
-    input  logic                  WR,
-    input  logic [DATA_WIDTH-1:0] WD,
-    output logic [DATA_WIDTH-1:0] RD
+    input  logic                  clk,
+    input  logic [ADDR_WIDTH-1:0] wa,
+    input  logic [ADDR_WIDTH-1:0] ra,
+    input  logic                  wr,
+    input  logic [WIDTH-1:0] wd,
+    output logic [WIDTH-1:0] rd
     );
 
-    logic [DATA_WIDTH-1:0] mem [0:DEPTH-1];
+    logic [WIDTH-1:0] mem [0:DEPTH-1];
 
-    always_ff @(posedge WCLK) begin
-        if (WR)
-            mem[WA] <= WD;
+    always_ff @(posedge clk) begin
+        if (wr)
+            mem[wa] <= wd;
     end
 
-    assign RD = mem[RA];
+    assign rd = mem[ra];
 
 endmodule
