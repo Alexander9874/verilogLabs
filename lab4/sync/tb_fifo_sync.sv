@@ -59,7 +59,9 @@ module tb_fifo_sync;
     always #5 clk = ~clk;
 
     initial begin
-        $display("TB BEGIN");
+//	$dumpfile("dump.vcd");
+//	$dumpvars(0, tb_fifo_sync);
+	$display("TB BEGIN");
         
         rst = 1;
         wr = 0;

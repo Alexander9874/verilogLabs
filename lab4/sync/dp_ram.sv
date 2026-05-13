@@ -21,23 +21,20 @@
 
 
 module dp_ram #(
-    parameter int WIDTH = 8,
-    parameter int DEPTH = 16
-    )(
-    input  logic                     clk,
-    input  logic [$clog2(DEPTH)-1:0] ra,
-    input  logic [$clog2(DEPTH)-1:0] wa,
-    input  logic                     wr,
-    input  logic [WIDTH-1:0]         wd,
-    output logic [WIDTH-1:0]         rd
+    parameter int WIDTH   = 8,
+    parameter int DEPTH   = 16,
+    localparam ADDR_WIDTH = $clog2(DEPTH)
+    ) (
+    input  logic                  clk,
+    input  logic [ADDR_WIDTH-1:0] ra,
+    input  logic [ADDR_WIDTH-1:0] wa,
+    input  logic                  wr,
+    input  logic [WIDTH-1:0]      wd,
+    output logic [WIDTH-1:0]      rd
     );
+
     logic [WIDTH-1:0] mem [0:DEPTH-1];
- 
-//    initial begin
-//        for (int i = 0; i < DEPTH; i++)
-//            mem[i] = '0;
-//    end
- 
+  
     always_ff @(posedge clk) begin
         if (wr)
             mem[wa] <= wd;

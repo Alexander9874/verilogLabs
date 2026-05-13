@@ -21,43 +21,45 @@
 
 
 module fifo_sync #(
-    parameter int WIDTH = 8,
-    parameter int DEPTH = 16,
-    parameter int ALMOST_EMPTY_PERCENT = 20
-    )(
-    input  logic             clk,
-    input  logic             rst,
-    input  logic             wr,
-    input  logic             rd,
-    input  logic [WIDTH-1:0] din,
-    output logic [WIDTH-1:0] dout,
-    output logic             empty,
-    output logic             full,
+    parameter int WIDTH                = 8,
+    parameter int DEPTH                = 16,
+    parameter int ALMOST_EMPTY_PERCENT = 20,
+    localparam int ADDR_WIDTH          = $clog2(DEPTH),
+    localparam int THRESHOLD           = (DEPTH * ALMOST_EMPTY_PERCENT) / 100
+    ) (
+    input  logic                  clk,
+    input  logic                  rst,
+    input  logic                  wr,
+    input  logic                  rd,
+    input  logic [WIDTH-1:0]      din,
     
-    output logic                   almost_empty,
-    output logic [$clog2(DEPTH):0] free_count
+    output logic [WIDTH-1:0]      dout,
+    output logic                  empty,
+    output logic                  full,
+    output logic                  almost_empty,
+    output logic [ADDR_WIDTH-1:0] free_count
     );
- 
-    localparam int ADDR_WIDTH = $clog2(DEPTH);
-    
-    
-    localparam int COUNT_WIDTH = $clog2(DEPTH);
-    localparam int THRESHOLD = (DEPTH * ALMOST_EMPTY_PERCENT) / 100;
-    logic [ADDR_WIDTH-1:0]   count;
 
     logic [ADDR_WIDTH-1:0] ra;
     logic [ADDR_WIDTH-1:0] wa;
-    logic                wr_en;
-    logic                rd_en;
     
-    counter #(.WIDTH(ADDR_WIDTH)) _read_addr_counter (
+    logic wr_en;
+    logic rd_en;
+    
+    assign empty = (ra == wa);
+    assign full  = (ra == (ADDR_WIDTH)'(wa + 1));
+    
+    assign wr_en = wr & ~full;
+    assign rd_en = rd & ~empty;
+    
+    counter #(.WIDTH(ADDR_WIDTH)) _read_counter (
         .clk (clk),
         .ce  (rd_en),
         .r   (rst),
         .q   (ra)
         );
  
-    counter #(.WIDTH(ADDR_WIDTH)) _write_addr_counter (
+    counter #(.WIDTH(ADDR_WIDTH)) _write_counter (
         .clk (clk),
         .ce  (wr_en),
         .r   (rst),
@@ -69,20 +71,16 @@ module fifo_sync #(
         .DEPTH (DEPTH)
         ) _dp_ram (
         .clk (clk),
-        .ra  (ra[ADDR_WIDTH:0]),
-        .wa  (wa[ADDR_WIDTH:0]),
+        .ra  (ra),
+        .wa  (wa),
         .wr  (wr_en),
         .wd  (din),
         .rd  (dout)
         );
         
-    assign empty = (ra == wa);
-    assign full  = (ra == (ADDR_WIDTH)'(wa + 1));
-    assign wr_en = wr & ~full;
-    assign rd_en = rd & ~empty;
-    
+    logic [ADDR_WIDTH-1:0] count;
     assign count = (wa - ra) & (DEPTH - 1);
-    assign free_count = (COUNT_WIDTH)'(DEPTH - count - 1);
+    assign free_count = (ADDR_WIDTH)'(DEPTH - count - 1);
     assign almost_empty = (count <= THRESHOLD);
  
 endmodule
